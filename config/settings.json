@@ -1,0 +1,26 @@
+{
+    "target_directories": {
+        "consoles_dir": "D:\\Consoles\\Consoles",
+        "output_dir": "D:\\Consoles\\converted_media"
+    },
+    "console_settings": {
+        "scan_all_consoles": true,
+        "target_consoles": []
+    },
+    "tool_settings": {
+        "suffix_action": "add",
+        "media_dir_identifier": "downloaded_media",
+        "valid_media_file_types": ["png", "mp4"],
+        "suffixes_by_media_type": {
+            "3dboxes": "",
+            "backcovers": "",
+            "covers": "-thumb",
+            "fanart": "",
+            "marquees": "-marquee",
+            "miximages": "",
+            "screenshots": "-image",
+            "titlescreens": "",
+            "videos": "-video"
+        }
+    }
+}
