@@ -6,6 +6,7 @@ import sys
 
 from common import constants
 from common.Singleton import Singleton
+from core.DirectoryHandler import DirectoryHandler
 from utils.Formatter import Formatter
 from utils.Logger import Logger
 
@@ -44,12 +45,12 @@ class ToolConfig(metaclass=Singleton):
     
     def get_target_consoles() -> list[str]:
         return ToolConfig.config_data[constants.CONFIG_CONSOLE_SETTINGS_KEY]["target_consoles"]
+    
+    def get_media_dir_identifier() -> str:
+        return str(ToolConfig.config_data[constants.CONFIG_CONSOLE_SETTINGS_KEY]["media_dir_identifier"])
 
     def get_suffix_action() -> str:
         return str(ToolConfig.config_data[constants.CONFIG_TOOL_SETTINGS_KEY]["suffix_action"])
-    
-    def get_media_dir_identifier() -> str:
-        return str(ToolConfig.config_data[constants.CONFIG_TOOL_SETTINGS_KEY]["media_dir_identifier"])
     
     def get_valid_media_file_types() -> list[str]:
         return ToolConfig.config_data[constants.CONFIG_TOOL_SETTINGS_KEY]["valid_media_file_types"]
@@ -104,44 +105,73 @@ class ToolConfig(metaclass=Singleton):
                         case _:
                             print("ERROR | Invalid reponse - enter 'y' or 'n'\n")
 
-            # verify "remove suffix" is configured as bool
-            if ToolConfig.get_suffix_action() not in ["add", "remove"]:
-                ToolConfig._invalid_config_response("Suffix action")
-
-            # verify that "media directory identifier" is present in target folders
+            # verify directories for configured "target_consoles" exist in "consoles_dir" and contain subdirectory named with "media_dir_identifier"
+            __target_consoles = []
             __media_dir_identifier = ToolConfig.get_media_dir_identifier()
-            # get all subfolders of configured consoles directory
-            __console_folders = [folder.name for folder in __consoles_dir.iterdir() if folder.is_dir()]
 
-            for console_name in __console_folders:
-                __current_console_folder_path = Path(str(__consoles_dir) + f"\\{console_name}")
-                __console_subfolders = [folder.name for folder in __current_console_folder_path.iterdir() if folder.is_dir()]
+            # if "scan_all_consoles" disabled, get specific target consoles as list
+            if not ToolConfig.is_scan_all_consoles_enabled():
+                __target_consoles = ToolConfig.get_target_consoles()
+            
+            # get all subdirectories of configured consoles directory
+            __consoles_dir_subdirs_list = DirectoryHandler.get_subdirectories(__consoles_dir)
+            ##__consoles_dir_subfolders = [folder.name for folder in __consoles_dir.iterdir() if folder.is_dir()]
 
-                for subfolder in __console_subfolders:
-                    # if a folder named with the "media_dir_identifier" not found, skip to next console folder
-                    if __media_dir_identifier not in __console_subfolders:
-                        Logger.log_message("warning", f"Skipped '{console_name}' folder -- does not contain a '\\{__media_dir_identifier}' folder")
+            for consoles_dir_subdir in __consoles_dir_subdirs_list:
+                # if scan all consoles is enabled, or console is configured as target
+                if not __target_consoles or consoles_dir_subdir in __target_consoles:
+                    __current_console_dir_path = DirectoryHandler.add_subdirectory_to_path(__consoles_dir, consoles_dir_subdir)
+                    ##__current_console_folder_path = Path(str(__consoles_dir) + f"\\{consoles_dir_subfolder}")
+                    __current_console_subdirs_list = DirectoryHandler.get_subdirectories(__current_console_dir_path)
+                    ##__console_subfolders = [folder.name for folder in __current_console_folder_path.iterdir() if folder.is_dir()]
+
+                for console_subdir in __current_console_subdirs_list:
+                    # if a directory named with the "media_dir_identifier" not found, skip to next console directory
+                    if __media_dir_identifier not in __current_console_subdirs_list:
+                        Logger.log_message("warning", f"Skipped '\\{consoles_dir_subdir}' directory -- does not contain a '\\{__media_dir_identifier}' subdirectory")
                         break
                     else:
-                        if subfolder == __media_dir_identifier:
-                            # build media folder path
-                            __media_folder_path = Path(str(__current_console_folder_path) + f"\\{subfolder}")
-                            break
-                
-                __media_subfolders = [folder.name for folder in __media_folder_path.iterdir() if folder.is_dir()]
-                for media_subfolder in __media_subfolders:
-                    
-                    
+                        if console_subdir == __media_dir_identifier:
+                            Logger.log_message("info", f"'\\{__media_dir_identifier}' subdirectory identified in '\\{consoles_dir_subdir}' directory ")
 
 
+            # verify "suffix_action" has valid configuration
+            if ToolConfig.get_suffix_action() not in ["add", "remove"]:
+                ToolConfig._invalid_config_response("Suffix action")    
+
+            # verify at least one valid file type specified in configuration
+            if not ToolConfig.get_valid_media_file_types():
+                Logger.log_message("error", f"At least one valid media file type must be specified in '{constants.CONFIG_FILE}'")
+                ToolConfig._invalid_config_response("Valid media file types")
+
+            # verify at least one suffix has been specified in configuration
+            __suffix_dict = ToolConfig.get_suffixes_by_media_type_dict()
+            __media_type_suffix_pairs = []
+
+            for media_type, suffix in __suffix_dict.items():
+                if suffix:
+                    __media_type_suffix_pairs.append((media_type, suffix))
+            
+            # if no suffixes configured
+            if not __media_type_suffix_pairs:
+                Logger.log_message("error", f"At least one (media type : suffix) pair must be specified in '{constants.CONFIG_FILE}'")
+                ToolConfig._invalid_config_response("Suffixes by media types")
+            else:
+                for pair in __media_type_suffix_pairs:
+                    # unpack pair tuples
+                    media_type, suffix = pair
+                    Logger.log_message("info", f"'{suffix}' will be added to files in '{media_type}' folders")
+
+            # all fields validated in config file
+            Logger.log_message("result", f"All configurations in '{constants.CONFIG_FILE}' are valid")
 
 
         except Exception as e:
             Logger.log_message("critical", f"'{constants.CONFIG_FILE}' validation failed: {e}")
 
-    def _invalid_config_response(invalid_config_key: str, invalid_messaging: bool=True, exit_program: bool=True) -> None:
+    def _invalid_config_response(config_key: str, invalid_messaging: bool=True, exit_program: bool=True) -> None:
         if invalid_messaging:
-            Logger.log_message("critical", f"{invalid_config_key} configuration in {constants.CONFIG_FILE} is invalid")
+            Logger.log_message("critical", f"{config_key} configuration in '{constants.CONFIG_FILE}' is invalid")
 
         if exit_program:
             Logger.log_message("info", f"Please verify that the '{constants.CONFIG_FILE}' file is configured correctly and try again")
