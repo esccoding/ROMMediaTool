@@ -5,11 +5,11 @@
     },
     "console_settings": {
         "scan_all_consoles": true,
-        "target_consoles": []
+        "target_consoles": [],
+        "media_dir_identifier": "downloaded_media"
     },
     "tool_settings": {
         "suffix_action": "add",
-        "media_dir_identifier": "downloaded_media",
         "valid_media_file_types": ["png", "mp4"],
         "suffixes_by_media_type": {
             "3dboxes": "",
