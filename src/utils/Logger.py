@@ -6,6 +6,7 @@ import sys
 from common.Singleton import Singleton
 from utils.Formatter import Formatter
 from utils.TestTime import TestTime
+from utils.TextColor import TextColor
 
 
 class Logger(metaclass=Singleton):
@@ -68,18 +69,18 @@ class Logger(metaclass=Singleton):
                 case 'INFO':
                     __labeled_message = f'{__level_label} {message}'                    # default 
                 case 'RESULT':
-                    __labeled_message = f'\033[0;32m{__level_label} {message}\033[0m'   # green
+                    __labeled_message = f'{TextColor.GREEN}{__level_label} {message}{TextColor.END}'   # green
                 case 'DEBUG':
-                    __labeled_message = f'\033[0;36m{__level_label} {message}\033[0m'   # cyan 
+                    __labeled_message = f'{TextColor.CYAN}{__level_label} {message}{TextColor.END}'   # cyan 
                 case 'WARNING':
-                    __labeled_message = f'\033[0;35m{__level_label} {message}\033[0m'   # purple  
+                    __labeled_message = f'{TextColor.PURPLE}{__level_label} {message}{TextColor.END}'   # purple  
                 case 'ERROR':                
-                    __labeled_message = f'\033[0;33m{__level_label} {message}\033[0m'   # yellow
+                    __labeled_message = f'{TextColor.YELLOW}{__level_label} {message}{TextColor.END}'   # yellow
                 case 'CRITICAL':
-                    __labeled_message = f'\033[0;31m{__level_label} {message}\033[0m'   # red
+                    __labeled_message = f'{TextColor.GREEN}{__level_label} {message}{TextColor.END}'   # red
             
             # console output        
-            print(f'[\033[2m{TestTime.get_fnow()}\033[0m] {__labeled_message}')         # dark gray
+            print(f'[{TextColor.DARK_GRAY}{TestTime.get_fnow()}{TextColor.END}] {__labeled_message}')         # dark gray
         
         # eventlog.csv output, if logging enabled
         if write_to_log and Logger.is_logging_enabled():

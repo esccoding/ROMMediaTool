@@ -9,6 +9,7 @@ from common.Singleton import Singleton
 from core.DirectoryHandler import DirectoryHandler
 from utils.Formatter import Formatter
 from utils.Logger import Logger
+from utils.TextColor import TextColor
 
 class ToolConfig(metaclass=Singleton):
     config_data = None
@@ -71,14 +72,16 @@ class ToolConfig(metaclass=Singleton):
             # verify target consoles directory exists in system
             __consoles_dir = ToolConfig.get_consoles_dir()
             if not os.path.exists(__consoles_dir):
+                Logger.log_message("critical", f"The configured consoles directory filepath '{__consoles_dir}' does not exist")
                 ToolConfig._invalid_config_response("Consoles directory")
             
             # verify target output directory exists in system; if not, prompt dir creation
             __output_dir = ToolConfig.get_output_dir()
             if not os.path.exists(__output_dir):
-                ToolConfig._invalid_config_response("Output directory", exit=False)
+                Logger.log_message("warning", f"The configured output directory filepath '{__output_dir}' does not exist")
+                ToolConfig._invalid_config_response("Output directory", exit_program=False)
                 while True:
-                    __create_dir_reply = input(f"Would you like to create a path to '{__output_dir}'  now? [y/n]")
+                    __create_dir_reply = input(f"Would you like to create a path to '{__output_dir}' now? [y/n]")
                     match __create_dir_reply:
                         case "y" | "yes":
                             # Create output filepath
@@ -182,12 +185,12 @@ class ToolConfig(metaclass=Singleton):
         ToolConfig()
         Logger.log_message("info", f"{Formatter.generate_header("Testing ToolConfig methods", capitalize=False)}")
         try:
-            Logger.log_message("info", f"\033[0;33mget_console_dir()\033[0m returned {type(ToolConfig.get_consoles_dir())} -> \033[0;32m{ToolConfig.get_consoles_dir()}\033[0m")
-            Logger.log_message("info", f"\033[0;33mget_output_dir()\033[0m returned {type(ToolConfig.get_output_dir())} -> \033[0;32m{ToolConfig.get_output_dir()}\033[0m")
-            Logger.log_message("info", f"\033[0;33mget_suffix_action()\033[0m returned {type(ToolConfig.get_suffix_action())} -> \033[0;32m{ToolConfig.get_suffix_action()}\033[0m")
-            Logger.log_message("info", f"\033[0;33mget_media_dir_identifier()\033[0m returned {type(ToolConfig.get_media_dir_identifier())} -> \033[0;32m{ToolConfig.get_media_dir_identifier()}\033[0m")
-            Logger.log_message("info", f"\033[0;33mget_valid_media_file_types()\033[0m returned {type(ToolConfig.get_valid_media_file_types())} -> \033[0;32m{ToolConfig.get_valid_media_file_types()}\033[0m")
-            Logger.log_message("info", f"\033[0;33mget_target_suffixes()\033[0m returned {type(ToolConfig.get_target_media_suffix_pairs())} -> \033[0;32m{ToolConfig.get_target_media_suffix_pairs()}\033[0m")
+            Logger.log_message("info", f"{TextColor.YELLOW}get_console_dir(){TextColor.END} returned {type(ToolConfig.get_consoles_dir())} -> {TextColor.GREEN}{ToolConfig.get_consoles_dir()}{TextColor.END}")
+            Logger.log_message("info", f"{TextColor.YELLOW}get_output_dir(){TextColor.END} returned {type(ToolConfig.get_output_dir())} -> {TextColor.GREEN}{ToolConfig.get_output_dir()}{TextColor.END}")
+            Logger.log_message("info", f"{TextColor.YELLOW}get_suffix_action(){TextColor.END} returned {type(ToolConfig.get_suffix_action())} -> {TextColor.GREEN}{ToolConfig.get_suffix_action()}{TextColor.END}")
+            Logger.log_message("info", f"{TextColor.YELLOW}get_media_dir_identifier(){TextColor.END} returned {type(ToolConfig.get_media_dir_identifier())} -> {TextColor.GREEN}{ToolConfig.get_media_dir_identifier()}{TextColor.END}")
+            Logger.log_message("info", f"{TextColor.YELLOW}get_valid_media_file_types(){TextColor.END} returned {type(ToolConfig.get_valid_media_file_types())} -> {TextColor.GREEN}{ToolConfig.get_valid_media_file_types()}{TextColor.END}")
+            Logger.log_message("info", f"{TextColor.YELLOW}get_target_suffixes(){TextColor.END} returned {type(ToolConfig.get_target_media_suffix_pairs())} -> {TextColor.GREEN}{ToolConfig.get_target_media_suffix_pairs()}{TextColor.END}")
         
         except Exception as e:
             Logger.log_message("critical", f"ToolConfig unit test has failed: {e}")
