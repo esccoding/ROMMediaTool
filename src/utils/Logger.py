@@ -77,10 +77,10 @@ class Logger(metaclass=Singleton):
                 case 'ERROR':                
                     __labeled_message = f'{TextColor.YELLOW}{__level_label} {message}{TextColor.END}'   # yellow
                 case 'CRITICAL':
-                    __labeled_message = f'{TextColor.GREEN}{__level_label} {message}{TextColor.END}'   # red
+                    __labeled_message = f'{TextColor.RED}{__level_label} {message}{TextColor.END}'   # red
             
             # console output        
-            print(f'[{TextColor.DARK_GRAY}{TestTime.get_fnow()}{TextColor.END}] {__labeled_message}')         # dark gray
+            print(f'[{TextColor.BLACK}{TestTime.get_fnow()}{TextColor.END}] {__labeled_message}')         # dark gray
         
         # eventlog.csv output, if logging enabled
         if write_to_log and Logger.is_logging_enabled():
