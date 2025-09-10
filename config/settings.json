@@ -10,7 +10,7 @@
     },
     "tool_settings": {
         "suffix_action": "add",
-        "valid_media_file_types": ["png", "mp4"],
+        "target_media_file_types": ["png", "mp4"],
         "suffixes_by_media_type": {
             "3dboxes": "",
             "backcovers": "",
