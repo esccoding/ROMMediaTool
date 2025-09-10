@@ -9,7 +9,7 @@ from common.Singleton import Singleton
 from core.DirectoryHandler import DirectoryHandler
 from utils.Formatter import Formatter
 from utils.Logger import Logger
-from utils.TextColor import TextColor
+from utils.TextColor import TextColor as tc
 
 class ToolConfig(metaclass=Singleton):
     config_data = None
@@ -19,6 +19,7 @@ class ToolConfig(metaclass=Singleton):
         Logger()
         Logger.log_message("info", "Logging successfully initialized")
 
+        # load in JSON dict from config file
         with open(f'.\\config\\{constants.CONFIG_FILE}') as config_file:
             config_data = json.load(config_file)
             config_file.close()
@@ -53,8 +54,8 @@ class ToolConfig(metaclass=Singleton):
     def get_suffix_action() -> str:
         return str(ToolConfig.config_data[constants.CONFIG_TOOL_SETTINGS_KEY]["suffix_action"])
     
-    def get_valid_media_file_types() -> list[str]:
-        return ToolConfig.config_data[constants.CONFIG_TOOL_SETTINGS_KEY]["valid_media_file_types"]
+    def get_target_media_file_types() -> list[str]:
+        return ToolConfig.config_data[constants.CONFIG_TOOL_SETTINGS_KEY]["target_media_file_types"]
     
     def get_suffixes_by_media_type_dict() -> dict:
         return ToolConfig.config_data[constants.CONFIG_TOOL_SETTINGS_KEY]["suffixes_by_media_type"]
@@ -68,6 +69,7 @@ class ToolConfig(metaclass=Singleton):
         return target_media_suffix_pairs
     
     def is_config_valid() -> bool:
+        Logger.log_message("info", f"Validating '{constants.CONFIG_FILE}' configuration...")
         try:
             # verify target consoles directory exists in system
             __consoles_dir = ToolConfig.get_consoles_dir()
@@ -79,31 +81,31 @@ class ToolConfig(metaclass=Singleton):
             __output_dir = ToolConfig.get_output_dir()
             if not os.path.exists(__output_dir):
                 Logger.log_message("warning", f"The configured output directory filepath '{__output_dir}' does not exist")
-                ToolConfig._invalid_config_response("Output directory", exit_program=False)
+                ToolConfig._invalid_config_response("Output directory", log_level="error", exit_program=False)
                 while True:
-                    __create_dir_reply = input(f"Would you like to create a path to '{__output_dir}' now? [y/n]")
+                    __create_dir_reply = input(f"Would you like to create a path to {tc.CYAN}'{__output_dir}'{tc.END} now? [y/n]\n>> ")
                     match __create_dir_reply:
                         case "y" | "yes":
                             # Create output filepath
                             try:
                                 os.makedirs(__output_dir)
-                                print(f"Nested directories '{__output_dir}' created successfully.")
+                                Logger.log_message("result", f"Path to '{__output_dir}' created successfully.")
                                 break
 
                             except FileExistsError:
-                                print(f"One or more directories in '{__output_dir}' already exist.")
+                                Logger.log_message("warning", f"One or more directories in '{__output_dir}' already exist.")
                                 ToolConfig._invalid_config_response("Output directory", invalid_messaging=False)
 
                             except PermissionError:
-                                print(f"Permission denied: Unable to create '{__output_dir}'.")
+                                Logger.log_message("critical", f"Permission denied: Unable to create '{__output_dir}'.")
                                 ToolConfig._invalid_config_response("Output directory", invalid_messaging=False)
 
                             except Exception as e:
-                                print(f"An error occurred: {e}")
+                                Logger.log_message("error", "An error occurred: {e}")
                                 ToolConfig._invalid_config_response("Output directory", invalid_messaging=False)
                                 
                         case "n" | "no":
-                            ToolConfig._invalid_config_response("Output directory", invalid_messaging=False)
+                            ToolConfig._invalid_config_response("Output directory")
 
                         case _:
                             print("ERROR | Invalid reponse - enter 'y' or 'n'\n")
@@ -112,40 +114,52 @@ class ToolConfig(metaclass=Singleton):
             __target_consoles = []
             __media_dir_identifier = ToolConfig.get_media_dir_identifier()
 
-            # if "scan_all_consoles" disabled, get specific target consoles as list
-            if not ToolConfig.is_scan_all_consoles_enabled():
+            # if 'scan_all_consoles' disabled, get configured 'target_consoles' as list
+            __scan_all_consoles = ToolConfig.is_scan_all_consoles_enabled()
+            if not __scan_all_consoles:
                 __target_consoles = ToolConfig.get_target_consoles()
+            else:
+                # get all subdirectories of configured consoles directory
+                __target_consoles = DirectoryHandler.get_subdirectories(__consoles_dir)
             
-            # get all subdirectories of configured consoles directory
-            __consoles_dir_subdirs_list = DirectoryHandler.get_subdirectories(__consoles_dir)
-            ##__consoles_dir_subfolders = [folder.name for folder in __consoles_dir.iterdir() if folder.is_dir()]
+            # if 'scan_all_consoles' disabled and no other target consoles configured
+            if not __scan_all_consoles and not __target_consoles:
+                Logger.log_message("error", f"'scan_all_consoles' setting is disabled in '{constants.CONFIG_FILE}'")
+                Logger.log_message("error", f"No target consoles specified in '{constants.CONFIG_FILE}'")
+                ToolConfig._invalid_config_response('Console settings')
 
-            for consoles_dir_subdir in __consoles_dir_subdirs_list:
-                # if scan all consoles is enabled, or console is configured as target
-                if not __target_consoles or consoles_dir_subdir in __target_consoles:
-                    __current_console_dir_path = DirectoryHandler.add_subdirectory_to_path(__consoles_dir, consoles_dir_subdir)
-                    ##__current_console_folder_path = Path(str(__consoles_dir) + f"\\{consoles_dir_subfolder}")
+            # check that each console dir contains subdir named with the "media_dir_identifier"
+            for console in __target_consoles:
+                __current_console_dir_path = DirectoryHandler.add_to_path(__consoles_dir, console)
+
+                try:
                     __current_console_subdirs_list = DirectoryHandler.get_subdirectories(__current_console_dir_path)
-                    ##__console_subfolders = [folder.name for folder in __current_console_folder_path.iterdir() if folder.is_dir()]
 
-                for console_subdir in __current_console_subdirs_list:
-                    # if a directory named with the "media_dir_identifier" not found, skip to next console directory
-                    if __media_dir_identifier not in __current_console_subdirs_list:
-                        Logger.log_message("warning", f"Skipped '\\{consoles_dir_subdir}' directory -- does not contain a '\\{__media_dir_identifier}' subdirectory")
-                        break
-                    else:
-                        if console_subdir == __media_dir_identifier:
-                            Logger.log_message("info", f"'\\{__media_dir_identifier}' subdirectory identified in '\\{consoles_dir_subdir}' directory ")
+                except FileNotFoundError:
+                    Logger.log_message("error", f"Configured target console '{console}' has no corresponding folder in consoles directory")
+                    ToolConfig._invalid_config_response("Target consoles")
 
+                # if "media_dir_identifier" subdir not found, skip to next console dir
+                if __media_dir_identifier not in __current_console_subdirs_list:
+                    Logger.log_message("warning", f"Skipped '\\{console}' directory -- does not contain a '\\{__media_dir_identifier}' subdirectory")
+                else:
+                    Logger.log_message("info", f"Media subdirectory identified in {tc.YELLOW}'\\{console}'{tc.END} directory ")
 
             # verify "suffix_action" has valid configuration
             if ToolConfig.get_suffix_action() not in ["add", "remove"]:
                 ToolConfig._invalid_config_response("Suffix action")    
 
             # verify at least one valid file type specified in configuration
-            if not ToolConfig.get_valid_media_file_types():
-                Logger.log_message("error", f"At least one valid media file type must be specified in '{constants.CONFIG_FILE}'")
-                ToolConfig._invalid_config_response("Valid media file types")
+            __target_media_file_types = ToolConfig.get_target_media_file_types()
+            if not __target_media_file_types:
+                Logger.log_message("error", f"At least one media file type must be specified as a target in '{constants.CONFIG_FILE}'")
+                ToolConfig._invalid_config_response("Target media file types")
+            else:
+                for file_type in __target_media_file_types:
+                    if file_type[:1] == ".":
+                        Logger.log_message("info", f"{tc.YELLOW}'{file_type}'{tc.END} files identified as target for name modification")
+                    else:
+                        Logger.log_message("info", f"{tc.YELLOW}'.{file_type}'{tc.END} files identified as target for name modification")
 
             # verify at least one suffix has been specified in configuration
             __suffix_dict = ToolConfig.get_suffixes_by_media_type_dict()
@@ -163,7 +177,7 @@ class ToolConfig(metaclass=Singleton):
                 for pair in __media_type_suffix_pairs:
                     # unpack pair tuples
                     media_type, suffix = pair
-                    Logger.log_message("info", f"'{suffix}' will be added to files in '{media_type}' folders")
+                    Logger.log_message("info", f"{tc.YELLOW}'{suffix}'{tc.END} will be added to filenames in {tc.CYAN}'{media_type}'{tc.END} folders")
 
             # all fields validated in config file
             Logger.log_message("result", f"All configurations in '{constants.CONFIG_FILE}' are valid")
@@ -172,9 +186,9 @@ class ToolConfig(metaclass=Singleton):
         except Exception as e:
             Logger.log_message("critical", f"'{constants.CONFIG_FILE}' validation failed: {e}")
 
-    def _invalid_config_response(config_key: str, invalid_messaging: bool=True, exit_program: bool=True) -> None:
+    def _invalid_config_response(config_key: str, log_level: str="critical", invalid_messaging: bool=True, exit_program: bool=True) -> None:
         if invalid_messaging:
-            Logger.log_message("critical", f"{config_key} configuration in '{constants.CONFIG_FILE}' is invalid")
+            Logger.log_message(f"{log_level}", f"Invalid {config_key.lower()} configuration in '{constants.CONFIG_FILE}'")
 
         if exit_program:
             Logger.log_message("info", f"Please verify that the '{constants.CONFIG_FILE}' file is configured correctly and try again")
@@ -185,12 +199,12 @@ class ToolConfig(metaclass=Singleton):
         ToolConfig()
         Logger.log_message("info", f"{Formatter.generate_header("Testing ToolConfig methods", capitalize=False)}")
         try:
-            Logger.log_message("info", f"{TextColor.YELLOW}get_console_dir(){TextColor.END} returned {type(ToolConfig.get_consoles_dir())} -> {TextColor.GREEN}{ToolConfig.get_consoles_dir()}{TextColor.END}")
-            Logger.log_message("info", f"{TextColor.YELLOW}get_output_dir(){TextColor.END} returned {type(ToolConfig.get_output_dir())} -> {TextColor.GREEN}{ToolConfig.get_output_dir()}{TextColor.END}")
-            Logger.log_message("info", f"{TextColor.YELLOW}get_suffix_action(){TextColor.END} returned {type(ToolConfig.get_suffix_action())} -> {TextColor.GREEN}{ToolConfig.get_suffix_action()}{TextColor.END}")
-            Logger.log_message("info", f"{TextColor.YELLOW}get_media_dir_identifier(){TextColor.END} returned {type(ToolConfig.get_media_dir_identifier())} -> {TextColor.GREEN}{ToolConfig.get_media_dir_identifier()}{TextColor.END}")
-            Logger.log_message("info", f"{TextColor.YELLOW}get_valid_media_file_types(){TextColor.END} returned {type(ToolConfig.get_valid_media_file_types())} -> {TextColor.GREEN}{ToolConfig.get_valid_media_file_types()}{TextColor.END}")
-            Logger.log_message("info", f"{TextColor.YELLOW}get_target_suffixes(){TextColor.END} returned {type(ToolConfig.get_target_media_suffix_pairs())} -> {TextColor.GREEN}{ToolConfig.get_target_media_suffix_pairs()}{TextColor.END}")
+            Logger.log_message("info", f"{tc.YELLOW}get_console_dir(){tc.END} returned {type(ToolConfig.get_consoles_dir())} -> {tc.GREEN}{ToolConfig.get_consoles_dir()}{tc.END}")
+            Logger.log_message("info", f"{tc.YELLOW}get_output_dir(){tc.END} returned {type(ToolConfig.get_output_dir())} -> {tc.GREEN}{ToolConfig.get_output_dir()}{tc.END}")
+            Logger.log_message("info", f"{tc.YELLOW}get_suffix_action(){tc.END} returned {type(ToolConfig.get_suffix_action())} -> {tc.GREEN}{ToolConfig.get_suffix_action()}{tc.END}")
+            Logger.log_message("info", f"{tc.YELLOW}get_media_dir_identifier(){tc.END} returned {type(ToolConfig.get_media_dir_identifier())} -> {tc.GREEN}{ToolConfig.get_media_dir_identifier()}{tc.END}")
+            Logger.log_message("info", f"{tc.YELLOW}get_target_media_file_types(){tc.END} returned {type(ToolConfig.get_target_media_file_types())} -> {tc.GREEN}{ToolConfig.get_target_media_file_types()}{tc.END}")
+            Logger.log_message("info", f"{tc.YELLOW}get_target_suffixes(){tc.END} returned {type(ToolConfig.get_target_media_suffix_pairs())} -> {tc.GREEN}{ToolConfig.get_target_media_suffix_pairs()}{tc.END}")
         
         except Exception as e:
             Logger.log_message("critical", f"ToolConfig unit test has failed: {e}")
