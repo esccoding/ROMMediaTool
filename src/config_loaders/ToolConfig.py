@@ -9,6 +9,7 @@ from common.Singleton import Singleton
 from core.DirectoryHandler import DirectoryHandler
 from utils.Formatter import Formatter
 from utils.Logger import Logger
+from utils.TestTime import TestTime
 from utils.TextColor import TextColor as tc
 
 class ToolConfig(metaclass=Singleton):
@@ -18,6 +19,7 @@ class ToolConfig(metaclass=Singleton):
         # init logging
         Logger()
         Logger.log_message("info", "Logging successfully initialized")
+        Logger.log_message("info", f"ROMMediaTool initialized at {TestTime.get_fstart()}")
 
         # load in JSON dict from config file
         with open(f'.\\config\\{constants.CONFIG_FILE}') as config_file:
@@ -35,6 +37,9 @@ class ToolConfig(metaclass=Singleton):
         Logger.log_message('info', f'Please verify that the "{constants.CONFIG_FILE}" file is formatted correctly and try again.')
         Logger.log_message('info', 'Program closing...')
         sys.exit()
+
+    def is_config_validation_enabled() -> bool:
+        return ToolConfig.config_data["validate_config"]
 
     def get_consoles_dir() -> Path:
         return Path(ToolConfig.config_data[constants.CONFIG_TARGET_DIR_KEY]["consoles_dir"])
@@ -126,7 +131,7 @@ class ToolConfig(metaclass=Singleton):
             if not __scan_all_consoles and not __target_consoles:
                 Logger.log_message("error", f"'scan_all_consoles' setting is disabled in '{constants.CONFIG_FILE}'")
                 Logger.log_message("error", f"No target consoles specified in '{constants.CONFIG_FILE}'")
-                ToolConfig._invalid_config_response('Console settings')
+                ToolConfig.__invalid_config_response('Console settings')
 
             # check that each console dir contains subdir named with the "media_dir_identifier"
             for console in __target_consoles:
@@ -137,7 +142,7 @@ class ToolConfig(metaclass=Singleton):
 
                 except FileNotFoundError:
                     Logger.log_message("error", f"Configured target console '{console}' has no corresponding folder in consoles directory")
-                    ToolConfig._invalid_config_response("Target consoles")
+                    ToolConfig.__invalid_config_response("Target consoles")
 
                 # if "media_dir_identifier" subdir not found, skip to next console dir
                 if __media_dir_identifier not in __current_console_subdirs_list:
@@ -147,13 +152,13 @@ class ToolConfig(metaclass=Singleton):
 
             # verify "suffix_action" has valid configuration
             if ToolConfig.get_suffix_action() not in ["add", "remove"]:
-                ToolConfig._invalid_config_response("Suffix action")    
+                ToolConfig.__invalid_config_response("Suffix action")    
 
             # verify at least one valid file type specified in configuration
             __target_media_file_types = ToolConfig.get_target_media_file_types()
             if not __target_media_file_types:
                 Logger.log_message("error", f"At least one media file type must be specified as a target in '{constants.CONFIG_FILE}'")
-                ToolConfig._invalid_config_response("Target media file types")
+                ToolConfig.__invalid_config_response("Target media file types")
             else:
                 for file_type in __target_media_file_types:
                     if file_type[:1] == ".":
@@ -172,7 +177,7 @@ class ToolConfig(metaclass=Singleton):
             # if no suffixes configured
             if not __media_type_suffix_pairs:
                 Logger.log_message("error", f"At least one (media type : suffix) pair must be specified in '{constants.CONFIG_FILE}'")
-                ToolConfig._invalid_config_response("Suffixes by media types")
+                ToolConfig.__invalid_config_response("Suffixes by media types")
             else:
                 for pair in __media_type_suffix_pairs:
                     # unpack pair tuples
@@ -186,7 +191,7 @@ class ToolConfig(metaclass=Singleton):
         except Exception as e:
             Logger.log_message("critical", f"'{constants.CONFIG_FILE}' validation failed: {e}")
 
-    def _invalid_config_response(config_key: str, log_level: str="critical", invalid_messaging: bool=True, exit_program: bool=True) -> None:
+    def __invalid_config_response(config_key: str, log_level: str="critical", invalid_messaging: bool=True, exit_program: bool=True) -> None:
         if invalid_messaging:
             Logger.log_message(f"{log_level}", f"Invalid {config_key.lower()} configuration in '{constants.CONFIG_FILE}'")
 
@@ -199,12 +204,12 @@ class ToolConfig(metaclass=Singleton):
         ToolConfig()
         Logger.log_message("info", f"{Formatter.generate_header("Testing ToolConfig methods", capitalize=False)}")
         try:
-            Logger.log_message("info", f"{tc.YELLOW}get_console_dir(){tc.END} returned {type(ToolConfig.get_consoles_dir())} -> {tc.GREEN}{ToolConfig.get_consoles_dir()}{tc.END}")
-            Logger.log_message("info", f"{tc.YELLOW}get_output_dir(){tc.END} returned {type(ToolConfig.get_output_dir())} -> {tc.GREEN}{ToolConfig.get_output_dir()}{tc.END}")
-            Logger.log_message("info", f"{tc.YELLOW}get_suffix_action(){tc.END} returned {type(ToolConfig.get_suffix_action())} -> {tc.GREEN}{ToolConfig.get_suffix_action()}{tc.END}")
-            Logger.log_message("info", f"{tc.YELLOW}get_media_dir_identifier(){tc.END} returned {type(ToolConfig.get_media_dir_identifier())} -> {tc.GREEN}{ToolConfig.get_media_dir_identifier()}{tc.END}")
-            Logger.log_message("info", f"{tc.YELLOW}get_target_media_file_types(){tc.END} returned {type(ToolConfig.get_target_media_file_types())} -> {tc.GREEN}{ToolConfig.get_target_media_file_types()}{tc.END}")
-            Logger.log_message("info", f"{tc.YELLOW}get_target_suffixes(){tc.END} returned {type(ToolConfig.get_target_media_suffix_pairs())} -> {tc.GREEN}{ToolConfig.get_target_media_suffix_pairs()}{tc.END}")
+            Logger.log_message("info", f"get_console_dir() returned {type(ToolConfig.get_consoles_dir())}, {ToolConfig.get_consoles_dir()}")
+            Logger.log_message("info", f"get_output_dir() returned {type(ToolConfig.get_output_dir())}, {ToolConfig.get_output_dir()}")
+            Logger.log_message("info", f"get_suffix_action() returned {type(ToolConfig.get_suffix_action())}, {ToolConfig.get_suffix_action()}")
+            Logger.log_message("info", f"get_media_dir_identifier() returned {type(ToolConfig.get_media_dir_identifier())}, {ToolConfig.get_media_dir_identifier()}")
+            Logger.log_message("info", f"get_target_media_file_types() returned {type(ToolConfig.get_target_media_file_types())}, {ToolConfig.get_target_media_file_types()}")
+            Logger.log_message("info", f"get_target_suffixes() returned {type(ToolConfig.get_target_media_suffix_pairs())}, {ToolConfig.get_target_media_suffix_pairs()}")
         
         except Exception as e:
             Logger.log_message("critical", f"ToolConfig unit test has failed: {e}")

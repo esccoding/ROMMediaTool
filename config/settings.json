@@ -1,4 +1,5 @@
 {
+    "validate_config": true,
     "target_directories": {
         "consoles_dir": "D:\\Consoles\\Consoles",
         "output_dir": "D:\\Consoles\\converted_media"
