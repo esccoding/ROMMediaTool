@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import sys
 
-
 from common import constants
 from common.Singleton import Singleton
 from core.DirectoryHandler import DirectoryHandler
@@ -14,6 +13,8 @@ from utils.TextColor import TextColor as tc
 
 class ToolConfig(metaclass=Singleton):
     config_data = None
+    target_media_dirs = []
+    output_dir = ""
 
     try:
         # init logging
@@ -45,7 +46,13 @@ class ToolConfig(metaclass=Singleton):
         return Path(ToolConfig.config_data[constants.CONFIG_TARGET_DIR_KEY]["consoles_dir"])
     
     def get_output_dir() -> Path:
-        return Path(ToolConfig.config_data[constants.CONFIG_TARGET_DIR_KEY]["output_dir"])
+        __output_path = ToolConfig.config_data[constants.CONFIG_TARGET_DIR_KEY]["output_dir"]
+        # if no configured output path
+        if not __output_path:
+            return ""
+        
+        else:
+            return Path(__output_path)
     
     def is_scan_all_consoles_enabled() -> bool:
         return ToolConfig.config_data[constants.CONFIG_CONSOLE_SETTINGS_KEY]["scan_all_consoles"]
@@ -76,44 +83,15 @@ class ToolConfig(metaclass=Singleton):
     def is_config_valid() -> bool:
         Logger.log_message("info", f"Validating '{constants.CONFIG_FILE}' configuration...")
         try:
-            # verify target consoles directory exists in system
-            __consoles_dir = ToolConfig.get_consoles_dir()
-            if not os.path.exists(__consoles_dir):
-                Logger.log_message("critical", f"The configured consoles directory filepath '{__consoles_dir}' does not exist")
-                ToolConfig._invalid_config_response("Consoles directory")
-            
-            # verify target output directory exists in system; if not, prompt dir creation
-            __output_dir = ToolConfig.get_output_dir()
-            if not os.path.exists(__output_dir):
-                Logger.log_message("warning", f"The configured output directory filepath '{__output_dir}' does not exist")
-                ToolConfig._invalid_config_response("Output directory", log_level="error", exit_program=False)
-                while True:
-                    __create_dir_reply = input(f"Would you like to create a path to {tc.CYAN}'{__output_dir}'{tc.END} now? [y/n]\n>> ")
-                    match __create_dir_reply:
-                        case "y" | "yes":
-                            # Create output filepath
-                            try:
-                                os.makedirs(__output_dir)
-                                Logger.log_message("result", f"Path to '{__output_dir}' created successfully.")
-                                break
+            # identify target consoles directory
+            __consoles_dir = ToolConfig.__identify_console_dir_path()
+            Logger.log_message("info", f"Console directory path identified as '{__consoles_dir}'", print_to_console=False)
+            Logger.log_message("info", f"Console directory path identified as {tc.CYAN}'{__consoles_dir}'{tc.END}", write_to_log=False)
 
-                            except FileExistsError:
-                                Logger.log_message("warning", f"One or more directories in '{__output_dir}' already exist.")
-                                ToolConfig._invalid_config_response("Output directory", invalid_messaging=False)
-
-                            except PermissionError:
-                                Logger.log_message("critical", f"Permission denied: Unable to create '{__output_dir}'.")
-                                ToolConfig._invalid_config_response("Output directory", invalid_messaging=False)
-
-                            except Exception as e:
-                                Logger.log_message("error", "An error occurred: {e}")
-                                ToolConfig._invalid_config_response("Output directory", invalid_messaging=False)
-                                
-                        case "n" | "no":
-                            ToolConfig._invalid_config_response("Output directory")
-
-                        case _:
-                            print("ERROR | Invalid reponse - enter 'y' or 'n'\n")
+            # identify output consoles directory
+            ToolConfig.output_dir = ToolConfig.__identify_output_dir_path()
+            Logger.log_message("info", f"Output directory path identified as '{ToolConfig.output_dir}'", print_to_console=False)
+            Logger.log_message("info", f"Output directory path identified as {tc.CYAN}'{ToolConfig.output_dir}'{tc.END}", write_to_log=False)
 
             # verify directories for configured "target_consoles" exist in "consoles_dir" and contain subdirectory named with "media_dir_identifier"
             __target_consoles = []
@@ -148,7 +126,10 @@ class ToolConfig(metaclass=Singleton):
                 if __media_dir_identifier not in __current_console_subdirs_list:
                     Logger.log_message("warning", f"Skipped '\\{console}' directory -- does not contain a '\\{__media_dir_identifier}' subdirectory")
                 else:
-                    Logger.log_message("info", f"Media subdirectory identified in {tc.YELLOW}'\\{console}'{tc.END} directory ")
+                    # append `media_dir_identifier` to current console path and append new path to class-global list of target directory paths
+                    ToolConfig.target_media_dirs.append(DirectoryHandler.add_to_path(__current_console_dir_path, __media_dir_identifier))
+                    Logger.log_message("info", f"Media subdirectory identified in '\\{console}' directory ", print_to_console=False)
+                    Logger.log_message("info", f"Media subdirectory identified in {tc.YELLOW}'\\{console}'{tc.END} directory ", write_to_log=False)
 
             # verify "suffix_action" has valid configuration
             if ToolConfig.get_suffix_action() not in ["add", "remove"]:
@@ -162,9 +143,11 @@ class ToolConfig(metaclass=Singleton):
             else:
                 for file_type in __target_media_file_types:
                     if file_type[:1] == ".":
-                        Logger.log_message("info", f"{tc.YELLOW}'{file_type}'{tc.END} files identified as target for name modification")
+                        Logger.log_message("info", f"'{file_type}' files identified as target for name modification", print_to_console=False)
+                        Logger.log_message("info", f"{tc.YELLOW}'{file_type}'{tc.END} files identified as target for name modification", write_to_log=False)
                     else:
-                        Logger.log_message("info", f"{tc.YELLOW}'.{file_type}'{tc.END} files identified as target for name modification")
+                        Logger.log_message("info", f"'.{file_type}' files identified as target for name modification", print_to_console=False)
+                        Logger.log_message("info", f"{tc.YELLOW}'.{file_type}'{tc.END} files identified as target for name modification", write_to_log=False)
 
             # verify at least one suffix has been specified in configuration
             __suffix_dict = ToolConfig.get_suffixes_by_media_type_dict()
@@ -182,14 +165,88 @@ class ToolConfig(metaclass=Singleton):
                 for pair in __media_type_suffix_pairs:
                     # unpack pair tuples
                     media_type, suffix = pair
-                    Logger.log_message("info", f"{tc.YELLOW}'{suffix}'{tc.END} will be added to filenames in {tc.CYAN}'{media_type}'{tc.END} folders")
+                    Logger.log_message("info", f"'{suffix}' will be added to filenames in '{media_type}' folders", print_to_console=False)
+                    Logger.log_message("info", f"{tc.YELLOW}'{suffix}'{tc.END} will be added to filenames in {tc.CYAN}'{media_type}'{tc.END} folders", write_to_log=False)
 
             # all fields validated in config file
             Logger.log_message("result", f"All configurations in '{constants.CONFIG_FILE}' are valid")
+            return True
 
 
         except Exception as e:
             Logger.log_message("critical", f"'{constants.CONFIG_FILE}' validation failed: {e}")
+
+    def __identify_console_dir_path() -> Path:
+        __consoles_dir = ToolConfig.get_consoles_dir()
+
+        # verify target consoles directory exists in system
+        if not os.path.exists(__consoles_dir):
+            Logger.log_message("critical", f"The configured consoles directory filepath '{__consoles_dir}' does not exist")
+            ToolConfig.__invalid_config_response("Consoles directory")     
+
+        return Path(__consoles_dir)
+    
+    def __identify_output_dir_path() -> Path:
+        # verify target output directory exists in system; if not, prompt dir creation
+        __output_dir = ToolConfig.get_output_dir()
+
+        # if no output dir configured, use default output folder (local "output")
+        if not __output_dir:
+            __output_dir = ".\\output"
+
+            # if default local "output" folder not yet created
+            if not os.path.exists(__output_dir):
+                try:
+                    ToolConfig.__create_path(__output_dir)
+
+                except Exception:
+                    ToolConfig.__invalid_config_response("Output directory", invalid_messaging=False)
+
+        # if output dir configured, verify path exists in system
+        if not os.path.exists(__output_dir):
+            Logger.log_message("warning", f"The configured output directory filepath '{__output_dir}' does not exist")
+            ToolConfig.__invalid_config_response("Output directory", log_level="error", exit_program=False)
+            
+            while True:
+                __create_dir_reply = input(f"Would you like to create a path to {tc.CYAN}'{__output_dir}'{tc.END} now? [y/n]\n>> ")
+                match __create_dir_reply:
+                    case "y" | "yes":
+                        try:
+                            ToolConfig.__create_path(__output_dir)
+                            break
+
+                        except Exception:
+                            ToolConfig.__invalid_config_response("Output directory")
+                    
+                    case "n" | "no":
+                        ToolConfig.__invalid_config_response("Output directory")
+
+                    case _:
+                        print("ERROR | Invalid reponse - enter 'y' or 'n'\n")
+                    
+        return Path(__output_dir)
+
+    def __create_path(desired_path: str) -> None:
+        # Create desired filepath
+        try:
+            os.makedirs(desired_path)
+            Logger.log_message("result", f"Path to '{desired_path}' created successfully.")
+            return
+
+        except FileExistsError as fee:
+            Logger.log_message("warning", f"One or more directories in '{desired_path}' already exist: {fee}")
+            Logger.log_message("error", f"Cannot create path to '{desired_path}'")
+            raise Exception
+
+        except PermissionError as pe:
+            Logger.log_message("warning", f"Permission denied: {pe}")
+            Logger.log_message("error", f"Cannot create path to '{desired_path}'")
+            raise Exception
+
+        except Exception as e:
+            Logger.log_message("warning", f"An error occurred: {e}")
+            Logger.log_message("error", f"Cannot create path to '{desired_path}'")
+            raise Exception
 
     def __invalid_config_response(config_key: str, log_level: str="critical", invalid_messaging: bool=True, exit_program: bool=True) -> None:
         if invalid_messaging:
